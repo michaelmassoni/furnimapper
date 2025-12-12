@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,36 +18,18 @@
     <script src="https://unpkg.com/konva@8.4.3/konva.min.js"></script>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <script>
-        (function(h,o,u,n,d) {
-          h=h[d]=h[d]||{q:[],onReady:function(c){h.q.push(c)}}
-          d=o.createElement(u);d.async=1;d.src=n
-          n=o.getElementsByTagName(u)[0];n.parentNode.insertBefore(d,n)
-        })(window,document,'script','https://www.datadoghq-browser-agent.com/us5/v6/datadog-rum.js','DD_RUM')
-        window.DD_RUM.onReady(function() {
-          window.DD_RUM.init({
-            clientToken: 'pub861572ee5933e87cb25b165789039921',
 
-            // `site` refers to the Datadog site parameter of your organization
-            // see https://docs.datadoghq.com/getting_started/site/
-            site: 'us5.datadoghq.com',
-            service: 'furnimapper',
-            env: 'prod',
-            // Specify a version number to identify the deployed version of your application in Datadog
-            // version: '1.0.0',
-            sessionSampleRate: 100,
-            sessionReplaySampleRate: 100,
-            defaultPrivacyLevel: 'allow',
-          });
-          
-        })
-        startSessionReplayRecording({ force: true })
-      </script>
 </head>
+
 <body>
+    <div class="theme-toggle-container">
+        <button id="theme-toggle-btn" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-moon-stars-fill"></i>
+        </button>
+    </div>
+
     <div class="container">
-        <h1 class="mb-0">Floor Plan Furniture Tool</h1>
-        <p class="small text-center mb-3"><a href="https://www.youtube.com/watch?v=OewO1WTooBA" target="_blank">(Demo & tutorial)</a></p>
+        <h1 class="mb-4">FurniMapper</h1>
 
         <div class="row align-items-center mb-3">
             <div class="col-md-6">
@@ -57,9 +40,10 @@
             </div>
             <div class="col-md-6">
                 <div class="input-group input-group-sm">
-                    <button id="import-btn" class="btn btn-primary">Import Floor Grid</button>
+                    <button id="import-btn" class="btn btn-primary">Import Grid</button>
                     <input type="file" id="json-upload" accept=".json" style="display: none;">
-                    <span id="import-file-name" class="form-control bg-light text-muted fst-italic text-truncate">Furniture not loaded</span>
+                    <span id="import-file-name"
+                        class="form-control bg-light text-muted fst-italic text-truncate">Furniture not loaded</span>
                 </div>
             </div>
         </div>
@@ -68,11 +52,12 @@
         <div class="controls">
             <button id="define-scale-btn" class="btn btn-purple btn-sm scale-btn">Define Scale</button>
             <button id="add-rectangle-btn" class="btn btn-primary btn-sm rectangle-btn">Add Furniture</button>
+            <button id="duplicate-object-btn" class="btn btn-info btn-sm" disabled>Duplicate</button>
             <button id="paste-furniture-btn" class="btn btn-success btn-sm">Paste Furniture</button>
             <button id="rotate-left-btn" class="btn btn-warning btn-sm rotate-btn" disabled>Rotate Left</button>
             <button id="rotate-object-btn" class="btn btn-warning btn-sm rotate-btn" disabled>Rotate Right</button>
-            <button id="delete-object-btn" class="btn btn-danger btn-sm delete-btn" disabled>Delete Furniture</button>
-            <button id="export-btn" class="btn btn-secondary btn-sm" disabled>Export Floor Grid</button>
+            <button id="delete-object-btn" class="btn btn-danger btn-sm delete-btn" disabled>Delete</button>
+            <button id="export-btn" class="btn btn-secondary btn-sm" disabled>Export Grid</button>
         </div>
 
         <div class="canvas-wrapper">
@@ -87,12 +72,12 @@
         <div class="modal-content">
             <h3>Add Furniture</h3>
             <div class="input-group">
-                <label for="rectangle-width">Width (feet):</label>
-                <input type="number" id="rectangle-width" min="0.1" step="0.1" placeholder="Enter width">
+                <label for="rectangle-width">Width (cm):</label>
+                <input type="number" id="rectangle-width" min="1" step="1" placeholder="Enter width">
             </div>
             <div class="input-group">
-                <label for="rectangle-height">Height (feet):</label>
-                <input type="number" id="rectangle-height" min="0.1" step="0.1" placeholder="Enter height">
+                <label for="rectangle-height">Height (cm):</label>
+                <input type="number" id="rectangle-height" min="1" step="1" placeholder="Enter height">
             </div>
             <div class="input-group">
                 <label for="rectangle-label">Label:</label>
@@ -111,7 +96,8 @@
             <h3>Paste Furniture Data</h3>
             <p class="text-muted">Paste CSV data for furniture items. </p>
             <div class="input-group">
-                <textarea id="furniture-data" class="form-control" rows="8" placeholder="Paste your furniture data here..."></textarea>
+                <textarea id="furniture-data" class="form-control" rows="8"
+                    placeholder="Paste your furniture data here..."></textarea>
             </div>
             <div class="modal-buttons">
                 <button id="cancel-paste-btn" class="btn btn-secondary">Cancel</button>
@@ -123,4 +109,5 @@
     <script src="helpers.js"></script>
     <script src="app.js"></script>
 </body>
+
 </html>

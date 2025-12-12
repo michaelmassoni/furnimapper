@@ -63,21 +63,21 @@ function parseFurnitureCSV(csvData) {
 
             // Validate values
             if (!item) {
-                console.warn(`Skipping row ${index+1}: missing item name`);
+                console.warn(`Skipping row ${index + 1}: missing item name`);
                 return;
             }
 
             // Validate numeric values
             if (isNaN(width) || width <= 0 || isNaN(length) || length <= 0) {
-                console.warn(`Skipping row ${index+1}: invalid dimensions for item "${item}"`);
+                console.warn(`Skipping row ${index + 1}: invalid dimensions for item "${item}"`);
                 return;
             }
 
             // Add valid item to the result array
             furnitureItems.push({
                 label: item,
-                widthFeet: width,
-                heightFeet: length
+                width: width,
+                height: length
             });
         });
 

@@ -4,92 +4,84 @@
     box-sizing: border-box;
 }
 
+:root {
+    --bg-color: #f5f5f5;
+    --text-color: #333;
+    --card-bg: white;
+    --card-shadow: rgba(0, 0, 0, 0.1);
+    --border-color: #ddd;
+    --modal-overlay: rgba(0, 0, 0, 0.5);
+    --input-bg: white;
+    --input-text: #333;
+    --heading-color: #2c3e50;
+    --canvas-bg: white;
+}
+
+body.dark-mode {
+    --bg-color: #1a1a1a;
+    --text-color: #e0e0e0;
+    --card-bg: #2d2d2d;
+    --card-shadow: rgba(0, 0, 0, 0.5);
+    --border-color: #444;
+    --modal-overlay: rgba(0, 0, 0, 0.7);
+    --input-bg: #444;
+    --input-text: #e0e0e0;
+    --heading-color: #e0e0e0;
+    --canvas-bg: #333;
+}
+
 body {
-    font-family: Arial, sans-serif;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     line-height: 1.6;
-    color: #333;
-    background-color: #f5f5f5;
+    color: var(--text-color);
+    background-color: var(--bg-color);
     padding: 20px;
+    transition: background-color 0.3s, color 0.3s;
 }
 
 .container {
-    max-width: 900px;
+    max-width: 1000px;
     margin: 0 auto;
-    background-color: white;
+    background-color: var(--card-bg);
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px var(--card-shadow);
 }
 
-h1 {
+h1, h3 {
     text-align: center;
-    margin-bottom: 20px;
-    color: #2c3e50;
+    color: var(--heading-color);
 }
 
-h3 {
-    margin-bottom: 15px;
-    color: #2c3e50;
-}
+h1 { margin-bottom: 20px; }
+h3 { margin-bottom: 15px; }
 
-.instructions-container {
-    margin-bottom: 20px;
-}
-
-.instructions-container .btn {
-    background-color: #6c757d;
-    border-color: #6c757d;
-    color: white;
-    text-align: left;
-}
-
-.instructions-container .btn:hover {
-    background-color: #5a6268;
-    border-color: #545b62;
-}
-
-.instructions-container .card {
-    border-left: 4px solid #6c757d;
-}
-
-.instructions-container .card-body {
-    background-color: #f8f9fa;
-    padding: 15px;
-}
-
+/* Canvas styles */
 .canvas-wrapper {
     display: flex;
     justify-content: center;
     margin-bottom: 20px;
+    overflow: hidden; /* Prevent scrollbars if canvas is slightly larger */
 }
 
 #canvas-container {
     width: 800px;
     height: 600px;
-    border: 1px solid #ddd;
-    background-color: white;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--border-color);
+    background-color: var(--canvas-bg);
+    box-shadow: 0 1px 3px var(--card-shadow);
+    /* Ensure canvas doesn't overflow */
+    max-width: 100%;
 }
 
-/* Upload controls now use Bootstrap classes */
-
-/* Controls container for buttons */
+/* Controls */
 .controls {
     display: flex;
     justify-content: center;
     align-items: center;
-    margin-top: 15px;
-    margin-bottom: 15px;
-    flex-wrap: nowrap;
-    gap: 5px;
-}
-
-/* Button styles are now handled by Bootstrap */
-
-/* Custom button spacing in controls */
-.controls .btn {
-    margin: 0 2px;
-    white-space: nowrap;
+    margin: 15px 0;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 /* Modal Styles */
@@ -101,27 +93,9 @@ h3 {
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
+    background-color: var(--modal-overlay);
     align-items: center;
     justify-content: center;
-}
-
-/* Settings Modal Styles */
-#settings-modal .modal-content {
-    max-width: 400px;
-}
-
-#settings-modal .form-check {
-    margin-bottom: 15px;
-}
-
-#settings-modal .form-check-label {
-    font-size: 16px;
-    margin-left: 5px;
-}
-
-#settings-modal .modal-buttons {
-    margin-top: 20px;
 }
 
 .modal.show {
@@ -129,29 +103,24 @@ h3 {
 }
 
 .modal-content {
-    background-color: white;
+    background-color: var(--card-bg);
     padding: 25px;
     border-radius: 8px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     width: 400px;
     max-width: 90%;
+    color: var(--text-color);
 }
 
-.modal-content p {
-    margin-bottom: 15px;
-}
-
-.modal-content input {
+.modal-content input, .modal-content textarea {
     width: 100%;
     padding: 10px;
-    margin-bottom: 20px;
-    border: 1px solid #ddd;
+    margin-bottom: 15px;
+    border: 1px solid var(--border-color);
     border-radius: 4px;
     font-size: 16px;
-}
-
-.input-group {
-    margin-bottom: 15px;
+    background-color: var(--input-bg);
+    color: var(--input-text);
 }
 
 .input-group label {
@@ -164,62 +133,30 @@ h3 {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
+    margin-top: 15px;
 }
 
-/* File name styles */
+/* Theme Toggle */
+.theme-toggle-container {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+}
 
-/* Scale button styles */
+.input-group-text, .form-control, .bg-light {
+    background-color: var(--input-bg) !important;
+    color: var(--input-text) !important;
+    border-color: var(--border-color) !important;
+}
+
+/* Specific button overrides for dark mode contrast if needed */
 .btn-purple {
-    background-color: #9C27B0; /* Purple color */
+    background-color: #9C27B0;
     color: white;
 }
-
-.btn-purple:hover {
-    background-color: #7B1FA2;
-    color: white;
-}
+.btn-purple:hover { background-color: #7B1FA2; color: white; }
 
 .scale-btn.active {
-    background-color: #FF5722 !important; /* Orange when active */
-    box-shadow: 0 0 5px rgba(255, 87, 34, 0.5);
-}
-
-/* Custom button styles for Bootstrap integration */
-
-/* Import button styles now use Bootstrap classes */
-
-/* File name styles now use Bootstrap classes */
-
-/* Bootstrap Menu Styles */
-.bootstrap-menu {
-    display: flex;
-    justify-content: center;
-    margin-bottom: 20px;
-}
-
-.bootstrap-menu .dropdown-toggle {
-    background-color: #007bff;
-    border-color: #007bff;
-    padding: 10px 20px;
-    font-size: 16px;
-}
-
-.bootstrap-menu .dropdown-toggle:hover {
-    background-color: #0069d9;
-    border-color: #0062cc;
-}
-
-.bootstrap-menu .dropdown-menu {
-    min-width: 200px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-.bootstrap-menu .dropdown-item {
-    padding: 8px 20px;
-    font-size: 15px;
-}
-
-.bootstrap-menu .dropdown-item:hover {
-    background-color: #f8f9fa;
-    color: #007bff;
+    background-color: #FF5722 !important;
+    box-shadow: 0 0 8px rgba(255, 87, 34, 0.6);
 }
