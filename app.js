@@ -1073,6 +1073,9 @@ function completeScaleDefinition() {
     // Update the button text to show the calculated scale
     updateScaleButtonText();
 
+    // Update dimensions of all existing objects
+    updateAllObjectSizes();
+
     console.log(`Scale set: ${scalePixelsPerCm.toFixed(2)} pixels per cm`);
 }
 
@@ -1808,6 +1811,58 @@ document.getElementById('show-dimensions-toggle').addEventListener('change', (e)
     updateObjectLabels();
 });
 
+// Function to update all object sizes when scale changes
+function updateAllObjectSizes() {
+    if (!scalePixelsPerCm) return;
+
+    objects.forEach(obj => {
+        // Calculate new pixel dimensions
+        const newWidthPixels = obj.width_cm * scalePixelsPerCm;
+        const newHeightPixels = obj.height_cm * scalePixelsPerCm;
+
+        // Update shape dimensions
+        obj.shape.width(newWidthPixels);
+        obj.shape.height(newHeightPixels);
+
+        // Update shape position to keep it centered in the group
+        obj.shape.x(-newWidthPixels / 2);
+        obj.shape.y(-newHeightPixels / 2);
+
+        // Update chevron size
+        if (obj.chevron) {
+            const minChevronSize = 20;
+            const proportionalSize = Math.min(newWidthPixels, newHeightPixels) * 0.15;
+            const chevronSize = Math.max(minChevronSize, proportionalSize);
+            const chevronWidth = chevronSize;
+            const chevronHeight = chevronSize * 0.6;
+
+            obj.chevron.points([
+                -chevronWidth / 2, newHeightPixels / 2 - chevronHeight * 1.5, // Left
+                0, newHeightPixels / 2 - chevronHeight * 0.5,              // Bottom
+                chevronWidth / 2, newHeightPixels / 2 - chevronHeight * 1.5  // Right
+            ]);
+        }
+
+        // Update text content with new dimensions if formatted
+        if (showDimensions) {
+            obj.text.text(`${obj.label} (${obj.width_cm.toFixed(1)}cm x ${obj.height_cm.toFixed(1)}cm)`);
+            // Re-center text
+            obj.text.offsetX(obj.text.width() / 2);
+            obj.text.offsetY(obj.text.height() / 2);
+        }
+
+        // IMPORTANT: We do NOT change group.x() or group.y()
+        // We assume the user placed the object where they visually wanted it on the floorplan image.
+        // Changing scale primarily implies the "real world size" of that image changed, 
+        // OR the user is correcting the scale because the furniture looks wrong.
+        // In the latter case, the furniture stays put, but shrinks/grows to match the "truth" of the image.
+    });
+
+    // Redraw
+    layer.batchDraw();
+    saveState();
+}
+
 // Initial setup
 updateExportButtonState();
 
@@ -2287,6 +2342,7 @@ async function autoDetectScale() {
             if (confirm(confirmMsg)) {
                 scalePixelsPerCm = finalScalePixelsPerCm;
                 updateScaleButtonText();
+                updateAllObjectSizes();
                 // alert(`Scale set to ${scalePixelsPerCm.toFixed(2)} px/cm`);
             }
         } else {
