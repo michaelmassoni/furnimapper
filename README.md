@@ -3,30 +3,36 @@
 FurniMapper is a browser-based tool for planning furniture layouts on floor plan images. It allows you to upload a floor plan, define a scale, and place customisable furniture objects to visualise your space.
 
 ## Features
+## Key Features
 
-*   **Metric Support**: All measurements are in centimeters (cm).
-*   **Floor Plan Import**: Upload any image file as your background. The tool automatically fits it to the workspace while maintaining the correct aspect ratio.
-*   **Scale Calibration**: Easily define the scale of your floor plan by drawing a line of a known real-world length.
-*   **Furniture Management**:
-    *   **Add**: Create furniture with custom dimensions and labels.
-    *   **Duplicate**: Quickly clone selected furniture items.
-    *   **Paste from spreadsheet**: Import multiple items at once via CSV/spreadsheet data.
-    *   **Manipulate**: Drag to move, click buttons or use keyboard shortcuts ('R', 'E') to rotate.
-*   **Dark Mode**: Comes with a built-in dark mode (default) and a light mode toggle.
-*   **Import/Export**: Save your layout as a JSON file and reload it later to continue working.
-*   **Offline Capable**: Runs entirely in the browser; no backend server required.
+- **Infinite Workspace**: The canvas automatically resizes to fill your window, allowing for unrestricted movement.
+- **Background Image Support**: Upload any floor plan image (JPG, PNG). It centers automatically.
+- **Smart Scale Definition**:
+    - **Manual**: Draw a line on a known dimension (e.g. a doorway) to define the scale.
+    - **Auto-Detect (Experimental)**: Uses OCR to find dimension labels in the image and suggest a scale. This may not work correctly for all floorplans, double check the result.
+- **Furniture Builder**:
+    - Interactive list to build your furniture inventory.
+    - **Bulk Import**: Paste data from spreadsheets (Label, Width, Depth).
+    - **Manual Entry**: Add individual items on the fly.
+- **Robust Persistence**:
+    - **Auto-save**: Your work (objects, scale, background image) saves automatically to your browser.
+    - **Undo/Redo**: Full history support for moving, rotating, adding, and deleting items.
+- **Intuitive Controls**:
+    - **Rotation**: Rotate items in 30-degree increments (R/L keys).
+    - **Visual Feedback**: Dimensions update in real-time as you scale or resize.
 
-## Quick Start
+## Usage
 
-1.  **Open the App**: Simply open `index.html` in your web browser.
-2.  **Upload Plan**: Click **"New Plan / Upload Image"** to select your floor plan image.
+1.  **Open the Tool**: Open `index.html` in a web browser. Alternatively, it is available at https://furnimapper.michaelmassoni.com
+2.  **Upload Plan**: Click "Choose File" to load your floor plan image.
 3.  **Define Scale**:
-    *   Click **"Define Scale"**.
-    *   Click and drag a line where you know the real-world distance (e.g. a doorway or a wall).
-    *   Enter the distance in centimeters (e.g. 90 for a standard door).
+    *   Click "Define Scale", draw a line over a known length, and enter the length in cm.
+    *   OR try "Auto Scale" to let the tool find dimensions for you.
 4.  **Add Furniture**:
-    *   Click **"Add Furniture"** to create a specific item.
-    *   Or, verify the **"Paste Furniture"** feature to bulk add items.
+    *   Click "Import List" to paste a list of furniture or add items manually.
+    *   Click "Add Item" to add a single generic rectangle.
+5.  **Arrange**: Drag items to position them. Click to select, then use buttons or keys to rotate/delete.
+6.  **Save**: Your work saves automatically. Just reopen the page to pick up where you left off.
 
 ## Bulk Import Format
 
