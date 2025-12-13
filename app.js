@@ -1,11 +1,25 @@
-const width = 800;
-const height = 600;
+const containerElement = document.getElementById('canvas-container');
+const width = containerElement.offsetWidth;
+const height = containerElement.offsetHeight;
 
 // Initialize Konva Stage and Layers
 const stage = new Konva.Stage({
     container: 'canvas-container',
     width: width,
     height: height,
+});
+
+// Update stage size on window resize
+window.addEventListener('resize', () => {
+    const container = document.getElementById('canvas-container');
+    const newWidth = container.offsetWidth;
+    const newHeight = container.offsetHeight;
+
+    stage.width(newWidth);
+    stage.height(newHeight);
+
+    // Redraw grid to cover new area
+    updateGrid(newWidth, newHeight);
 });
 
 // Create separate layers for background image and drawing elements
@@ -26,6 +40,206 @@ const rotationIncrement = 30; // Rotation increment in degrees
 // State variable for showing dimensions
 let showDimensions = false; // Default to not showing dimensions
 
+// Furniture Import Builder State
+let pendingFurnitureItems = [];
+
+
+// History System
+const historyStack = [];
+let historyStep = -1;
+let isHistoryAction = false;
+const MAX_HISTORY = 50;
+
+function saveState() {
+    if (isHistoryAction) return;
+
+    // Prune future history if we're not at the latest step
+    if (historyStep < historyStack.length - 1) {
+        historyStack.length = historyStep + 1;
+    }
+
+    // Limit history size
+    if (historyStack.length >= MAX_HISTORY) {
+        historyStack.shift();
+        historyStep--;
+    }
+    // Get background image data if available
+    let bgImageData = null;
+    let bgImageDims = null;
+    if (backgroundImage && backgroundImage.image()) {
+        try {
+            bgImageData = backgroundImage.image().src;
+            bgImageDims = {
+                width: backgroundImage.width(),
+                height: backgroundImage.height(),
+                x: backgroundImage.x(),
+                y: backgroundImage.y(),
+                // Store the stage dimensions at the time of saving to ensure correct scaling/positioning
+                // We're already storing scalePixelsPerCm, but background position depends on stage size
+            };
+        } catch (e) {
+            console.warn("Could not save background image (likely cross-origin)", e);
+        }
+    }
+
+    const state = {
+        objects: objects.map(obj => ({
+            type: obj.type,
+            label: obj.label,
+            width_cm: obj.width_cm,
+            height_cm: obj.height_cm,
+            x_pixels: obj.x_pixels,
+            y_pixels: obj.y_pixels,
+            rotation_degrees: obj.rotation_degrees || 0,
+            color: obj.shape.fill() // Save the color
+        })),
+        scalePixelsPerCm: scalePixelsPerCm,
+        background: bgImageData ? {
+            data: bgImageData,
+            dims: bgImageDims
+        } : null
+    };
+
+    const json = JSON.stringify(state);
+
+    // Don't save if state hasn't changed (basic check)
+    if (historyStack.length > 0 && historyStack[historyStack.length - 1] === json) {
+        return;
+    }
+
+    historyStack.push(json);
+    historyStep++;
+    updateUndoRedoButtons();
+    saveToLocalStorage();
+}
+
+function saveToLocalStorage() {
+    if (historyStep >= 0 && historyStack[historyStep]) {
+        try {
+            localStorage.setItem('furnimap_autosave', historyStack[historyStep]);
+        } catch (e) {
+            console.error("Auto-save failed (likely storage limit):", e);
+            // Optional: Notify user? 
+            // For now just error log to avoid breaking the app flow
+        }
+    }
+}
+
+function undo() {
+    if (historyStep > 0) {
+        historyStep--;
+        isHistoryAction = true; // Prevent saving state during undo
+        loadState(historyStack[historyStep]);
+        isHistoryAction = false;
+        updateUndoRedoButtons();
+        saveToLocalStorage(); // Sync current viewed state to storage
+    }
+}
+
+function redo() {
+    if (historyStep < historyStack.length - 1) {
+        historyStep++;
+        isHistoryAction = true;
+        loadState(historyStack[historyStep]);
+        isHistoryAction = false;
+        updateUndoRedoButtons();
+        saveToLocalStorage();
+    }
+}
+
+function loadState(json) {
+    try {
+        const state = JSON.parse(json);
+
+        // Restore Scale
+        if (state.scalePixelsPerCm) {
+            scalePixelsPerCm = state.scalePixelsPerCm;
+            updateScaleButtonText();
+        }
+
+        // Clear existing objects
+        clearAllObjects(); // Ensure this function exists or is implemented below
+
+        // Restore Objects
+        if (state.objects) {
+            // We need to re-create the visual elements for each object
+            // NOTE: createObjectFromData needs to return the object reference or we push it manually.
+            // Based on `importFloorGrid`, we might need to be careful.
+            // Let's reuse logic from export/import if available, or just replicate creation.
+            // Actually, `createObjectFromData` is used in import. Let's use it.
+
+            state.objects.forEach(item => {
+                createObjectFromData(item);
+            });
+        }
+
+        // Restore Background Image
+        if (state.background && state.background.data) {
+            const img = new Image();
+            img.onload = () => {
+                if (backgroundImage) backgroundImage.destroy();
+
+                // If we possess saved dimensions/position, use them
+                // Otherwise fit to stage as before? 
+                // Let's rely on saved dims if available for exact restoration
+
+                const dims = state.background.dims;
+
+                // Center the image on the stage if new stage size is different? 
+                // Or just restore exactly? Restoring exactly is safer for alignment.
+                // But if window resized? 
+                // Let's start with exact restoration of position/size
+
+                backgroundImage = new Konva.Image({
+                    x: dims ? dims.x : 0,
+                    y: dims ? dims.y : 0,
+                    image: img,
+                    width: dims ? dims.width : img.width,
+                    height: dims ? dims.height : img.height,
+                    listening: false,
+                });
+
+                // Add to layer and move to bottom
+                backgroundLayer.add(backgroundImage);
+                backgroundImage.moveToBottom();
+                backgroundLayer.batchDraw();
+
+                // Also update grid
+                updateGrid(stage.width(), stage.height());
+            };
+            img.src = state.background.data;
+        }
+    } catch (e) {
+        console.error("Failed to load state", e);
+    }
+}
+
+function updateUndoRedoButtons() {
+    const undoBtn = document.getElementById('undo-btn');
+    const redoBtn = document.getElementById('redo-btn');
+    if (undoBtn) undoBtn.disabled = historyStep <= 0;
+    if (redoBtn) redoBtn.disabled = historyStep >= historyStack.length - 1;
+}
+
+function saveToLocalStorage() {
+    if (historyStep >= 0 && historyStack[historyStep]) {
+        localStorage.setItem('furnimap_autosave', historyStack[historyStep]);
+    }
+}
+
+function loadFromLocalStorage() {
+    const saved = localStorage.getItem('furnimap_autosave');
+    if (saved) {
+        // Push initial state if stack is empty
+        if (historyStack.length === 0) {
+            historyStack.push(saved);
+            historyStep = 0;
+            loadState(saved);
+            updateUndoRedoButtons();
+        }
+    }
+}
+
 // Make sure all elements are properly initialized when the DOM is loaded
 window.addEventListener('DOMContentLoaded', () => {
     // Initialize toggle checkboxes
@@ -43,15 +257,19 @@ window.addEventListener('DOMContentLoaded', () => {
     // Initialize modal elements
     pasteFurnitureModal = document.getElementById('paste-furniture-modal');
     furnitureDataTextarea = document.getElementById('furniture-data');
-    parseFurnitureBtn = document.getElementById('parse-furniture-btn');
+    parseFurnitureBtn = document.getElementById('parse-furniture-btn'); // Old button, might be gone
     cancelPasteBtn = document.getElementById('cancel-paste-btn');
 
-    if (parseFurnitureBtn) {
-        parseFurnitureBtn.addEventListener('click', parseFurnitureData);
-        console.log('Parse Furniture button initialized');
-    } else {
-        console.error('Parse Furniture button not found');
-    }
+    // New builder elements
+    const builderAddBtn = document.getElementById('builder-add-btn');
+    const processBulkPasteBtn = document.getElementById('process-bulk-paste-btn');
+    const clearListBtn = document.getElementById('clear-list-btn');
+    const commitFurnitureBtn = document.getElementById('commit-furniture-btn');
+
+    if (builderAddBtn) builderAddBtn.addEventListener('click', addFurnitureFromBuilder);
+    if (processBulkPasteBtn) processBulkPasteBtn.addEventListener('click', processBulkPaste);
+    if (clearListBtn) clearListBtn.addEventListener('click', clearFurnitureList);
+    if (commitFurnitureBtn) commitFurnitureBtn.addEventListener('click', commitFurnitureToPlan);
 
     if (cancelPasteBtn) {
         cancelPasteBtn.addEventListener('click', hidePasteFurnitureModal);
@@ -59,6 +277,46 @@ window.addEventListener('DOMContentLoaded', () => {
     } else {
         console.error('Cancel Paste button not found');
     }
+
+    // Initialize Auto-detect Scale button
+    const autoDetectBtn = document.getElementById('auto-detect-btn');
+    if (autoDetectBtn) {
+        autoDetectBtn.addEventListener('click', autoDetectScale);
+        console.log('Auto Detect button initialized');
+    } else {
+        console.error('Auto Detect button not found');
+    }
+
+    // Initialize Undo/Redo buttons
+    const undoBtn = document.getElementById('undo-btn');
+    const redoBtn = document.getElementById('redo-btn');
+
+    if (undoBtn) {
+        undoBtn.addEventListener('click', undo);
+    }
+    if (redoBtn) {
+        redoBtn.addEventListener('click', redo);
+    }
+
+    // Load auto-saved data
+    loadFromLocalStorage();
+
+    // If no history (fresh load), save initial state
+    if (historyStack.length === 0) {
+        saveState();
+    }
+
+    // Keyboard shortcuts for Undo/Redo
+    document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+            e.preventDefault();
+            undo();
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+            e.preventDefault();
+            redo();
+        }
+    });
 });
 
 // State variables for scale definition
@@ -148,7 +406,8 @@ function drawGrid() {
 }
 
 // Draw initial grid lines
-drawGrid();
+// Draw initial grid lines
+updateGrid(width, height);
 
 // Image upload functionality
 const imageUploadInput = document.getElementById('image-upload');
@@ -175,29 +434,32 @@ imageUploadInput.addEventListener('change', (e) => {
                 backgroundImage.destroy();
             }
 
-            // Calculate dimensions to fit within the canvas while maintaining aspect ratio
-            const maxWidth = 800; // Original width or preferred max width
-            const maxHeight = 600; // Original height or preferred max height
+            // Do NOT resize stage to match image, keeping stage full screen
+            // Calculate scale to fit image within the current stage or just ensure it's reasonable
+            // Let's fit it within the view (with some padding) but keep aspect ratio
+            const padding = 20;
+            const availableWidth = stage.width() - (padding * 2);
+            const availableHeight = stage.height() - (padding * 2);
 
             let newWidth = img.width;
             let newHeight = img.height;
 
-            // Calculate scale factor to fit
-            const scaleX = maxWidth / img.width;
-            const scaleY = maxHeight / img.height;
-            const scale = Math.min(scaleX, scaleY);
+            // Calculate scale factor to fit within view initially (nice UX)
+            const scaleX = availableWidth / img.width;
+            const scaleY = availableHeight / img.height;
+            const scale = Math.min(scaleX, scaleY, 1); // Don't upscale if smaller than screen, just fit or actual size
 
             newWidth = img.width * scale;
             newHeight = img.height * scale;
 
-            // Resize the stage to match the image dimensions
-            stage.width(newWidth);
-            stage.height(newHeight);
+            // Center the image on the stage
+            const centerX = (stage.width() - newWidth) / 2;
+            const centerY = (stage.height() - newHeight) / 2;
 
             // Create new Konva image
             backgroundImage = new Konva.Image({
-                x: 0,
-                y: 0,
+                x: centerX,
+                y: centerY,
                 image: img,
                 width: newWidth,  // Scale to calculated width
                 height: newHeight, // Scale to calculated height
@@ -214,9 +476,11 @@ imageUploadInput.addEventListener('change', (e) => {
             backgroundLayer.batchDraw();
 
             // Also redraw the main layer (grid lines might need adjusting if we were dynamic with them)
-            // But currently grid lines are static 800x600 in drawGrid() - we might want to update that too
-            // For now, let's update grid lines to match new stage size
-            updateGrid(newWidth, newHeight);
+            // Ensure grid covers the whole stage
+            updateGrid(stage.width(), stage.height());
+
+            // Save state after loading image
+            saveState();
         };
         img.src = event.target.result;
     };
@@ -444,7 +708,7 @@ function duplicateSelectedObject() {
 
     group.on('mouseenter', () => {
         text.visible(true);
-        selectObject(objectIndex);
+        // Removed auto-select
         layer.batchDraw();
     });
 
@@ -455,6 +719,7 @@ function duplicateSelectedObject() {
     selectObject(objectIndex);
     layer.batchDraw();
     updateExportButtonState();
+    saveState();
 }
 
 // Theme Toggle
@@ -1029,10 +1294,6 @@ function createRectangle() {
     group.on('mouseenter', () => {
         // Show text on hover
         text.visible(true);
-
-        // Auto-select the object on hover
-        selectObject(objectIndex);
-
         layer.batchDraw();
     });
 
@@ -1050,7 +1311,9 @@ function createRectangle() {
     // Redraw the layer
     layer.batchDraw();
 
-    console.log(`Successfully created object: ${label} with dimensions ${widthFeet}' x ${heightFeet}'`);
+    console.log(`Successfully created object: ${label} with dimensions ${widthCm}cm x ${heightCm}cm`);
+
+    saveState();
 }
 
 // Function to select an object
@@ -1179,7 +1442,8 @@ function createObjectFromData(objectData) {
             y: -heightPixels / 2, // Position relative to group center
             width: widthPixels,
             height: heightPixels,
-            fill: getRandomColor(0.6),
+            height: heightPixels,
+            fill: objectData.color || getRandomColor(0.6), // Use saved color or random
             stroke: '#000',
             strokeWidth: 2,
         });
@@ -1271,6 +1535,7 @@ function createObjectFromData(objectData) {
             objects[objectIndex].x_pixels = group.x() - widthPixels / 2;
             objects[objectIndex].y_pixels = group.y() - heightPixels / 2;
             console.log(`Object ${objectData.label} moved to position: (${objects[objectIndex].x_pixels.toFixed(2)}, ${objects[objectIndex].y_pixels.toFixed(2)})`);
+            saveState();
         });
 
         // Add click handler for selection
@@ -1287,10 +1552,6 @@ function createObjectFromData(objectData) {
         group.on('mouseenter', () => {
             // Show text on hover
             text.visible(true);
-
-            // Auto-select the object on hover
-            selectObject(objectIndex);
-
             layer.batchDraw();
         });
 
@@ -1306,6 +1567,7 @@ function createObjectFromData(objectData) {
         layer.batchDraw();
 
         console.log(`Successfully created object: ${objectData.label}`);
+
         return true; // Return true to indicate success
     } else {
         console.warn(`Unknown object type: ${objectData.type}`);
@@ -1388,7 +1650,10 @@ function deleteSelectedObject() {
     // Redraw the layer
     layer.batchDraw();
 
+    layer.batchDraw();
+
     console.log('Object deleted');
+    saveState();
 }
 
 // Function to update object event handlers after deletion
@@ -1411,10 +1676,6 @@ function updateObjectEventHandlers() {
         obj.group.on('mouseenter', () => {
             // Show text on hover
             obj.text.visible(true);
-
-            // Auto-select the object on hover
-            selectObject(index);
-
             layer.batchDraw();
         });
 
@@ -1466,6 +1727,7 @@ function rotateSelectedObject() {
     layer.batchDraw();
 
     console.log('Object rotated to:', newRotation, 'degrees');
+    saveState();
 }
 
 // Function to rotate the selected object counterclockwise
@@ -1498,6 +1760,7 @@ function rotateSelectedObjectCounterclockwise() {
     layer.batchDraw();
 
     console.log('Object rotated to:', newRotation, 'degrees (counterclockwise)');
+    saveState();
 }
 
 // Add keyboard event listener for rotating objects with 'r' and 'e' keys
@@ -1579,52 +1842,144 @@ function hidePasteFurnitureModal() {
     pasteFurnitureModal.classList.remove('show');
 }
 
-// Function to parse furniture data from textarea
-function parseFurnitureData() {
-    const data = furnitureDataTextarea.value.trim();
+// Function to add item from manual inputs
+function addFurnitureFromBuilder() {
+    const labelInput = document.getElementById('builder-label');
+    const widthInput = document.getElementById('builder-width');
+    const depthInput = document.getElementById('builder-depth');
 
-    if (!data) {
-        alert('Please paste furniture data first.');
+    const label = labelInput.value.trim() || 'Furniture';
+    const width = parseFloat(widthInput.value);
+    const depth = parseFloat(depthInput.value);
+
+    if (!width || !depth || width <= 0 || depth <= 0) {
+        alert("Please enter valid width and depth.");
         return;
     }
 
-    try {
-        // Use the helper function to parse the CSV data
-        const furnitureItems = parseFurnitureCSV(data);
+    pendingFurnitureItems.push({ label, width, depth });
 
-        if (furnitureItems.length === 0) {
-            alert('No valid furniture data found. Please check your format. Expected format: Item\tWidth\tLength with a header row. Dimensions should be in cm.');
+    // Clear inputs
+    labelInput.value = '';
+    widthInput.value = '';
+    depthInput.value = '';
+    labelInput.focus();
+
+    renderFurnitureList();
+}
+
+// Function to process bulk paste text
+function processBulkPaste() {
+    const data = furnitureDataTextarea.value.trim();
+    if (!data) return;
+
+    try {
+        const items = parseFurnitureCSV(data);
+        if (items.length === 0) {
+            alert("No valid data found.");
             return;
         }
 
-        // Create furniture objects for each parsed item
-        let successCount = 0;
-
-        furnitureItems.forEach(item => {
-            // Calculate center position (middle of the stage)
-            const centerX = stage.width() / 2;
-            const centerY = stage.height() / 2;
-
-            // Create the furniture object
-            // Note: We assume the CSV data contains CM now. If it has 'widthFeet' property, we ignore the name and treat value as CM.
-            // Or better, we update helpers.js? I'll check helpers next. For now, let's treat the values as CM.
+        items.forEach(item => {
             const w = item.widthFeet || item.width || 0;
             const h = item.heightFeet || item.height || item.length || 0;
-            createFurnitureObject(centerX, centerY, w, h, item.label);
-            successCount++;
+            if (w > 0 && h > 0) {
+                pendingFurnitureItems.push({
+                    label: item.label,
+                    width: w,
+                    depth: h
+                });
+            }
         });
 
-        if (successCount > 0) {
-            alert(`Successfully added ${successCount} furniture item(s).`);
-            hidePasteFurnitureModal();
-        } else {
-            alert('No furniture items were added. Please check the console for details.');
-        }
-    } catch (error) {
-        console.error('Error parsing furniture data:', error);
-        alert('Error parsing furniture data. Please check your format.');
+        furnitureDataTextarea.value = ''; // Clear textarea
+        renderFurnitureList();
+
+        // Collapse the section (using Bootstrap API if available, or just via CSS class toggle if simpler, 
+        // but for now let's just leave it open or clear it)
+        const bsCollapse = new bootstrap.Collapse(document.getElementById('bulk-paste-section'), {
+            toggle: false
+        });
+        bsCollapse.hide();
+
+    } catch (e) {
+        console.error("Bulk parse error", e);
+        alert("Error parsing data.");
     }
 }
+
+// Function to render the pending list
+function renderFurnitureList() {
+    const tbody = document.getElementById('furniture-list-body');
+    const emptyMsg = document.getElementById('empty-list-message');
+
+    tbody.innerHTML = '';
+
+    if (pendingFurnitureItems.length === 0) {
+        emptyMsg.style.display = 'block';
+    } else {
+        emptyMsg.style.display = 'none';
+        pendingFurnitureItems.forEach((item, index) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${item.label}</td>
+                <td>${item.width}</td>
+                <td>${item.depth}</td>
+                <td><button class="btn btn-sm btn-outline-danger p-0 px-1" onclick="removePendingItem(${index})">&times;</button></td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+}
+
+// Global function for onclick handler
+window.removePendingItem = function (index) {
+    pendingFurnitureItems.splice(index, 1);
+    renderFurnitureList();
+};
+
+function clearFurnitureList() {
+    pendingFurnitureItems = [];
+    renderFurnitureList();
+}
+
+// Function to commit list to plan
+function commitFurnitureToPlan() {
+    if (pendingFurnitureItems.length === 0) {
+        alert("List is empty.");
+        return;
+    }
+
+    // Check scale
+    if (scalePixelsPerCm === null) {
+        alert('Please define the scale using the "Define Scale" button first.');
+        return;
+    }
+
+    let successCount = 0;
+    // Calculate center
+    const centerX = stage.width() / 2;
+    const centerY = stage.height() / 2;
+    // Arrange in a grid or stack? Stack is fine, user will move them.
+    // Or slight offset.
+
+    pendingFurnitureItems.forEach((item, i) => {
+        const offset = i * 10;
+        createFurnitureObject(centerX + offset, centerY + offset, item.width, item.depth, item.label);
+        successCount++;
+    });
+
+    alert(`Added ${successCount} items to plan.`);
+    pendingFurnitureItems = []; // Clear list after adding
+    renderFurnitureList();
+    hidePasteFurnitureModal();
+    saveState();
+}
+
+// Old parse function can be removed or kept as helper reference? 
+// The implementation plan says "Remove raw 'Paste & Parse' direct execution".
+// So we replaced `parseFurnitureData` with `processBulkPaste` logic above.
+
 
 // Function to create a furniture object at the specified position
 function createFurnitureObject(centerX, centerY, widthCm, heightCm, label) {
@@ -1715,6 +2070,7 @@ function createFurnitureObject(centerX, centerY, widthCm, heightCm, label) {
         objects[objectIndex].x_pixels = group.x() - widthPixels / 2;
         objects[objectIndex].y_pixels = group.y() - heightPixels / 2;
         console.log(`Object ${label} moved to position: (${objects[objectIndex].x_pixels.toFixed(2)}, ${objects[objectIndex].y_pixels.toFixed(2)})`);
+        saveState();
     });
 
     // Add hover event handlers to show/hide full text
@@ -1737,6 +2093,30 @@ function createFurnitureObject(centerX, centerY, widthCm, heightCm, label) {
 
     // Return the created object index
     return objectIndex;
+}
+
+// Function to add snapping logic to an object group
+function addSnapping(group) {
+    group.on('dragmove', (e) => {
+        // Skip snapping if Alt key is pressed
+        if (e.evt.altKey) return;
+
+        const gridSize = 10; // Snap to 10px grid for finer control (visual grid is 20)
+
+        // Get current position
+        const x = group.x();
+        const y = group.y();
+
+        // Calculate snapped position
+        const snappedX = Math.round(x / gridSize) * gridSize;
+        const snappedY = Math.round(y / gridSize) * gridSize;
+
+        // Apply snapped position
+        group.position({
+            x: snappedX,
+            y: snappedY
+        });
+    });
 }
 
 // Bootstrap Menu Event Handlers
@@ -1833,3 +2213,229 @@ document.getElementById('menu-settings').addEventListener('click', (e) => {
     // Show the modal
     settingsModal.classList.add('show');
 });
+
+// Auto-detect Scale Logic
+async function autoDetectScale() {
+    if (!backgroundImage) {
+        alert("Please upload a floor plan image first.");
+        return;
+    }
+
+    // Show loading
+    const loadingOverlay = document.getElementById('loading-overlay');
+    loadingOverlay.style.display = 'flex';
+
+    try {
+        const imageElement = backgroundImage.image();
+
+        console.log("Starting OCR...");
+        // Recognize text
+        const result = await Tesseract.recognize(
+            imageElement,
+            'eng',
+            { logger: m => console.log(m) }
+        );
+
+        console.log("OCR Result:", result);
+        const candidates = processOCRResults(result);
+
+        if (candidates.length === 0) {
+            alert("No room dimensions found in the image text (looking for format like '4.0 x 3.5' or '4000 x 3500').");
+            loadingOverlay.style.display = 'none';
+            return;
+        }
+
+        console.log(`Found ${candidates.length} text candidates:`, candidates);
+
+        // Analyze geometry for candidates
+        const candidatesWithScale = [];
+
+        // Create a canvas to extract pixel data from the source image
+        const canvas = document.createElement('canvas');
+        canvas.width = imageElement.width;
+        canvas.height = imageElement.height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(imageElement, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        for (const candidate of candidates) {
+            const scaleData = analyzeRoomGeometry(candidate, imageData);
+            if (scaleData) {
+                candidatesWithScale.push(scaleData);
+            }
+        }
+
+        loadingOverlay.style.display = 'none';
+
+        if (candidatesWithScale.length > 0) {
+            // Sort by deviation (lower is better)
+            candidatesWithScale.sort((a, b) => a.deviation - b.deviation);
+
+            const best = candidatesWithScale[0];
+
+            // Calculate visual scale adjustment
+            // The image might be scaled on the stage
+            const visualScaleFactor = backgroundImage.width() / imageElement.width;
+            const finalScalePixelsPerCm = best.scale * visualScaleFactor;
+
+            const confirmMsg = `Detected scale based on text "${best.text}"\n` +
+                `Dimensions: ${best.w_meter}m x ${best.h_meter}m\n` +
+                `Calculated Scale: ${finalScalePixelsPerCm.toFixed(2)} px/cm\n` +
+                `Confidence deviation: ${(best.deviation * 100).toFixed(1)}% (lower is better)\n\n` +
+                `Do you want to apply this scale?`;
+
+            if (confirm(confirmMsg)) {
+                scalePixelsPerCm = finalScalePixelsPerCm;
+                updateScaleButtonText();
+                // alert(`Scale set to ${scalePixelsPerCm.toFixed(2)} px/cm`);
+            }
+        } else {
+            alert("Found dimension text but could not reliably detect corresponding walls from the center of the text.");
+        }
+
+    } catch (error) {
+        console.error(error);
+        alert("Error during auto-detection: " + error.message);
+        loadingOverlay.style.display = 'none';
+    }
+}
+
+function processOCRResults(result) {
+    const candidates = [];
+    // Regex for "4.0 x 3.5" or "4.0x3.5" or "4000 x 3500"
+    // Also captures "3.6m x 3.0m"
+    const pattern = /(\d+(?:\.\d+)?)\s*[m]?\s*[xX]\s*(\d+(?:\.\d+)?)\s*[m]?/;
+
+    // Iterate lines
+    if (result.data && result.data.lines) {
+        result.data.lines.forEach(line => {
+            const text = line.text.trim();
+            const match = text.match(pattern);
+            if (match) {
+                let w = parseFloat(match[1]);
+                let h = parseFloat(match[2]);
+
+                // Heuristic for m vs mm vs cm vs missing decimal
+                // Case 1: > 1000. Likely mm. 4000mm = 4m.
+                if (w >= 1000) w /= 1000;
+                else if (w >= 100) w /= 100; // Case 2: 100-1000. Likely cm. 400cm = 4m.
+                else if (w >= 20) w /= 10;   // Case 3: 20-100. Likely m with missing decimal (OCR error). 36 -> 3.6m.
+
+                if (h >= 1000) h /= 1000;
+                else if (h >= 100) h /= 100;
+                else if (h >= 20) h /= 10;
+
+                // BBox info
+                const bbox = line.bbox; // x0, y0, x1, y1
+                const centerX = (bbox.x0 + bbox.x1) / 2;
+                const centerY = (bbox.y0 + bbox.y1) / 2;
+
+                candidates.push({
+                    text: text,
+                    w_meter: w,
+                    h_meter: h,
+                    cx: centerX,
+                    cy: centerY,
+                    bbox: bbox
+                });
+            }
+        });
+    }
+    return candidates;
+}
+
+function analyzeRoomGeometry(candidate, imageData) {
+    const w = imageData.width;
+    const h = imageData.height;
+    const data = imageData.data;
+
+    // Helper to get pixel brightness (0-255)
+    function getBrightness(x, y) {
+        x = Math.floor(x);
+        y = Math.floor(y);
+        if (x < 0 || x >= w || y < 0 || y >= h) return 0;
+        const i = (y * w + x) * 4;
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        return (r + g + b) / 3;
+    }
+
+    // Threshold for "Wall" - darker than white background
+    // Floor plans are usually white/light grey, walls black/dark grey.
+    // Threshold < 200 is "not white". Threshold < 100 is "dark".
+    const WALL_THRESHOLD = 180;
+
+    // We scan OUTWARDS from bbox.
+    // Start slightly outside bbox to avoid text itself
+    const padding = 2;
+
+    // 1. Scan Left
+    let x_left = candidate.bbox.x0 - padding;
+    while (x_left > 0 && getBrightness(x_left, candidate.cy) > WALL_THRESHOLD) {
+        x_left--;
+    }
+
+    // 2. Scan Right
+    let x_right = candidate.bbox.x1 + padding;
+    while (x_right < w && getBrightness(x_right, candidate.cy) > WALL_THRESHOLD) {
+        x_right++;
+    }
+
+    // 3. Scan Up
+    let y_top = candidate.bbox.y0 - padding;
+    while (y_top > 0 && getBrightness(candidate.cx, y_top) > WALL_THRESHOLD) {
+        y_top--;
+    }
+
+    // 4. Scan Down
+    let y_bottom = candidate.bbox.y1 + padding;
+    while (y_bottom < h && getBrightness(candidate.cx, y_bottom) > WALL_THRESHOLD) {
+        y_bottom++;
+    }
+
+    const pixelWidth = x_right - x_left;
+    const pixelHeight = y_bottom - y_top;
+
+    // Sanity check: must have hit walls inside image
+    if (x_left <= 0 || x_right >= w || y_top <= 0 || y_bottom >= h) {
+        return null;
+    }
+
+    // Minimum reasonable size (e.g. 50 pixels) to avoid noise
+    if (pixelWidth < 20 || pixelHeight < 20) return null;
+
+    // We have pixel dims: Pw, Ph
+    // We have meter dims: Mw, Mh
+    // Calculate Pw/Mw (scale X) and Ph/Mh (scale Y)
+    // Check orientation 1: Mw -> Pw
+    const scale1_W = pixelWidth / (candidate.w_meter * 100); // px/cm
+    const scale1_H = pixelHeight / (candidate.h_meter * 100);
+    const deviation1 = Math.abs(scale1_W - scale1_H) / ((scale1_W + scale1_H) / 2);
+
+    // Check orientation 2: Mh -> Pw
+    const scale2_W = pixelWidth / (candidate.h_meter * 100);
+    const scale2_H = pixelHeight / (candidate.w_meter * 100);
+    const deviation2 = Math.abs(scale2_W - scale2_H) / ((scale2_W + scale2_H) / 2);
+
+    let bestScale, deviation;
+
+    if (deviation1 < deviation2) {
+        bestScale = (scale1_W + scale1_H) / 2;
+        deviation = deviation1;
+    } else {
+        bestScale = (scale2_W + scale2_H) / 2;
+        deviation = deviation2;
+    }
+
+    // If deviation is too high (> 15%), it's likely not a match
+    if (deviation > 0.25) return null;
+
+    return {
+        ...candidate,
+        scale: bestScale,
+        deviation: deviation,
+        pixelWidth,
+        pixelHeight
+    };
+}

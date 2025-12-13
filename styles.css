@@ -40,38 +40,47 @@ body {
 }
 
 .container {
-    max-width: 1000px;
+    max-width: 98%;
     margin: 0 auto;
     background-color: var(--card-bg);
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 4px 6px var(--card-shadow);
+    display: flex;
+    flex-direction: column;
+    height: 95vh;
 }
 
-h1, h3 {
+h1,
+h3 {
     text-align: center;
     color: var(--heading-color);
 }
 
-h1 { margin-bottom: 20px; }
-h3 { margin-bottom: 15px; }
+h1 {
+    margin-bottom: 20px;
+}
+
+h3 {
+    margin-bottom: 15px;
+}
 
 /* Canvas styles */
 .canvas-wrapper {
     display: flex;
     justify-content: center;
     margin-bottom: 20px;
-    overflow: hidden; /* Prevent scrollbars if canvas is slightly larger */
+    overflow: hidden;
+    flex-grow: 1;
+    /* Allow it to grow to fill container */
 }
 
 #canvas-container {
-    width: 800px;
-    height: 600px;
+    width: 100%;
+    height: 100%;
     border: 1px solid var(--border-color);
     background-color: var(--canvas-bg);
     box-shadow: 0 1px 3px var(--card-shadow);
-    /* Ensure canvas doesn't overflow */
-    max-width: 100%;
 }
 
 /* Controls */
@@ -96,10 +105,78 @@ h3 { margin-bottom: 15px; }
     background-color: var(--modal-overlay);
     align-items: center;
     justify-content: center;
+    color: white;
+    flex-direction: column;
 }
 
 .modal.show {
     display: flex;
+}
+
+/* Dark Mode Table Overrides */
+body.dark-mode .table {
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .table thead th {
+    background-color: #3d3d3d;
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .table tbody td {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border-color: var(--border-color);
+}
+
+body.dark-mode .table-striped>tbody>tr:nth-of-type(odd)>* {
+    color: var(--text-color);
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* Ensure text muted is visible in dark mode */
+body.dark-mode .text-muted {
+    color: #aaa !important;
+}
+
+/* Furniture List Container Border */
+body.dark-mode #furniture-list-container {
+    border-color: var(--border-color) !important;
+}
+
+/* Fix Placeholder Contrast in Dark Mode */
+body.dark-mode ::placeholder {
+    color: #bbb;
+    opacity: 1;
+    /* Firefox */
+}
+
+body.dark-mode :-ms-input-placeholder {
+    /* Internet Explorer 10-11 */
+    color: #bbb;
+}
+
+body.dark-mode ::-ms-input-placeholder {
+    /* Microsoft Edge */
+    color: #bbb;
+}
+
+/* Builder Input/Button alignment fixes */
+#paste-furniture-modal .row .form-control {
+    margin-bottom: 0 !important;
+    /* Remove generic bottom margin to allow align-items-end to work */
+}
+
+#builder-add-btn {
+    padding: 10px;
+    /* Match generic input padding defined in styles.css */
+    height: 100%;
+    /* Ensure it fills height if needed, though padding usually suffices */
+    /* Adjust font-size if needed, but inheriting is likely fine */
+    line-height: normal;
+    /* Normalize line-height */
 }
 
 .modal-content {
@@ -112,7 +189,8 @@ h3 { margin-bottom: 15px; }
     color: var(--text-color);
 }
 
-.modal-content input, .modal-content textarea {
+.modal-content input,
+.modal-content textarea {
     width: 100%;
     padding: 10px;
     margin-bottom: 15px;
@@ -143,7 +221,9 @@ h3 { margin-bottom: 15px; }
     right: 20px;
 }
 
-.input-group-text, .form-control, .bg-light {
+.input-group-text,
+.form-control,
+.bg-light {
     background-color: var(--input-bg) !important;
     color: var(--input-text) !important;
     border-color: var(--border-color) !important;
@@ -154,9 +234,46 @@ h3 { margin-bottom: 15px; }
     background-color: #9C27B0;
     color: white;
 }
-.btn-purple:hover { background-color: #7B1FA2; color: white; }
+
+.btn-purple:hover {
+    background-color: #7B1FA2;
+    color: white;
+}
 
 .scale-btn.active {
     background-color: #FF5722 !important;
     box-shadow: 0 0 8px rgba(255, 87, 34, 0.6);
+}
+
+.btn-outline-purple {
+    color: #9C27B0;
+    border-color: #9C27B0;
+}
+
+.btn-outline-purple:hover {
+    background-color: #9C27B0;
+    color: white;
+}
+
+/* Loading Overlay */
+.loading-overlay {
+    display: none;
+    /* Hidden by default */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    z-index: 2000;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    color: white;
+}
+
+.loading-text {
+    margin-top: 15px;
+    font-size: 1.2rem;
+    font-weight: 500;
 }
